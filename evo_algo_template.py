@@ -1,3 +1,5 @@
+import random
+
 # class thuật toán (GA/MFEA) (khởi tạo quần thể, tính toán...)
 # class bài toán (TSP/Knapsack)
 # class lai tạo, đột biến...
