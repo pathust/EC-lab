@@ -2,6 +2,7 @@
 ## Cần hoàn thành:
 - Các class cho thuật toán (GA, MFEA), bao gồm việc khởi tạo quần thể, tính toán, lai tạo, tiến hoá...
 - Các class cho bài toán (TSP, Knapsack), phục vụ việc đọc dữ liệu, tính toán giá trị...
+- Các class biểu diễn cá thể. Cá thể nên có thuộc tính Genome, fitness và hàm copy()
 - Các class/function bổ trợ: lai tạo, đột biến; giải mã/mã hoá cá thể
 
 ## Khi hoàn thành các yêu cầu trên, sử dụng class Experiment như sau:
