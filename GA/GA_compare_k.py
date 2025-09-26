@@ -1,6 +1,12 @@
 import random
 import math
 import json
+import matplotlib.pyplot as plt
+
+generation_eil51_permutation_best_found = []
+generation_eil51_real_coded_best_found = []
+generation_eil101_permutation_best_found = []
+generation_eil101_real_coded_best_found = []
 
 # class định nghĩa cá thể
 # khởi tạo ở dạng đã mã hoá nếu có
@@ -187,9 +193,10 @@ class GA:
         self.mutate_rate = mutate_rate # tỉ lệ đột biến
         self.crossover_rate = crossover_rate # tỉ lệ lai
         self.ops = ops # kiểu individual
-        self.k_tournament = k_tournament
         self.best_individual = ops() # individual tốt nhất tìm được
         self.answer = self.problem.best_individual # đáp án của bài toán
+        self.k_tournament = k_tournament
+        self.history_best = []
         print(f"Answer fitness: {self.answer["fitness"]}")
     
     def initialize(self):
@@ -211,6 +218,8 @@ class GA:
     def run(self):
         self.initialize()
         self.evaluate()
+        best = min(self.population, key=lambda ind: ind.fitness)
+        self.history_best.append(best.fitness)
 
         for _ in range(self.num_generation):
             new_population = []
@@ -238,6 +247,8 @@ class GA:
             self.population = new_population[:self.max_pop]
             self.evaluate()
             best = min(self.population, key=lambda ind: ind.fitness)
+            self.history_best.append(best.fitness) 
+
             # print(f"Generation {_}: best fitness = {best.fitness}")
             if best.fitness < self.best_individual.fitness:
                 self.best_individual = best.copy()
@@ -269,86 +280,57 @@ class Experiment:
             print(f"Seed {i}, best = {algorithm.best_individual.fitness}") 
             best_individual_decoded = algorithm.ops().decode(algorithm.best_individual)
             result.append(best_individual_decoded)
-        return result
+        return result, algorithm.history_best
 
-# danh sách thí nghiệm
-experiments = [
-    {
-        "name": "eil51-permutation",
-        "exp": Experiment(
-            GA, TSP, range(32),
-            ops=PermutationIndividual,
-            k_tournament = 7,
-            file_name="GA/eil51.dat",
-            opt_file_name="GA/eil51opt.dat"
-        )
-    },
-    {
-        "name": "eil101-permutation",
-        "exp": Experiment(
-            GA, TSP, range(32),
-            ops=PermutationIndividual,
-            k_tournament = 7,
-            file_name="GA/eil101.dat",
-            opt_file_name="GA/eil101opt.dat"
-        )
-    },
-    {
-        "name": "eil51-real-coded",
-        "exp": Experiment(
-            GA, TSP, range(32),
-            ops=RealCodedIndividual,
-            k_tournament = 3,
-            file_name="GA/eil51.dat",
-            opt_file_name="GA/eil51opt.dat"
-        )
-    },
-    {
-        "name": "eil101-real-coded",
-        "exp": Experiment(
-            GA, TSP, range(32),
-            ops=RealCodedIndividual,
-            k_tournament = 3,
-            file_name="GA/eil101.dat",
-            opt_file_name="GA/eil101opt.dat"
-        )
-    }
+ks = [1, 3, 5, 7, 9, 11]
+ops_cfg = [
+    ("permutation", "Permutation", PermutationIndividual),
+    ("real-coded", "Real-coded", RealCodedIndividual),
 ]
 
-# chạy và lưu kết quả
-import json
+# Tạo experiments tự động 
+experiments = []
+for key, label, ops_cls in ops_cfg:
+    for k in ks:
+        experiments.append({
+            "name": f"eil51-{key}-k={k}",
+            "label": label,
+            "key": key,
+            "k": k,
+            "exp": Experiment(
+                GA, TSP, range(1),
+                ops=ops_cls,
+                k_tournament=k,
+                file_name="GA/eil51.dat",
+                opt_file_name="GA/eil51opt.dat",
+            ),
+        })
 
+# Chạy với các k
+histories = { "permutation": {}, "real-coded": {} }
 for e in experiments:
     print(f"Running experiment: {e['name']}")
-    result = e["exp"].run()  # result: list[Individual], một cá thể tốt nhất cho mỗi seed
+    result, history_best = e["exp"].run() 
+    histories[e["key"]][e["k"]] = history_best
 
-    # list kết quả từng cá thể tốt nhất (theo seed)
-    result_data = [
-        {
-            "seed": seed_idx,
-            "fitness": ind.fitness,
-            "genome": ", ".join(map(str, ind.genome)),
-        }
-        for seed_idx, ind in enumerate(result)
-    ]
+plt.figure()
+for k in ks:
+    plt.plot(histories["real-coded"][k], label=f"Real-coded k={k} (eil51)")
+plt.xlabel("Generation")
+plt.ylabel("Best fitness")
+plt.title("Best-of-Generation on eil51 (Real-coded)")
+plt.legend()
+plt.grid(True, alpha=0.3)
+plt.tight_layout()
+plt.savefig("GA/images/plot_eil51_real_coded_different_k.png", dpi=150)
 
-    # tính Average và Best Found + best_seed_index
-    fitness_list = [ind.fitness for ind in result]
-    avg_fitness = sum(fitness_list) / len(fitness_list)
-    best_found = min(fitness_list)
-    best_seed_index = fitness_list.index(best_found)
-
-    output = {
-        "summary": {
-            "average_fitness": avg_fitness,
-            "best_found":     best_found,
-            "best_seed_index": best_seed_index
-        },
-        "results": result_data
-    }
-
-    out_file = f"GA/result-{e['name']}_Vinh.json"
-    with open(out_file, "w") as f:
-        json.dump(output, f, indent=4)
-
-    print(f"Saved: {out_file}")
+plt.figure()
+for k in ks:
+    plt.plot(histories["permutation"][k], label=f"Permutation k={k} (eil51)")
+plt.xlabel("Generation")
+plt.ylabel("Best fitness")
+plt.title("Best-of-Generation on eil51 (Permutation)")
+plt.legend()
+plt.grid(True, alpha=0.3)
+plt.tight_layout()
+plt.savefig("GA/images/plot_eil51_permutation_different_k.png", dpi=150)
