@@ -1,0 +1,358 @@
+import random
+import math
+import json
+import matplotlib.pyplot as plt
+
+generation_eil51_permutation_best_found = []
+generation_eil51_real_coded_best_found = []
+generation_eil101_permutation_best_found = []
+generation_eil101_real_coded_best_found = []
+
+# class định nghĩa cá thể
+# khởi tạo ở dạng đã mã hoá nếu có
+class Individual:
+    def __init__(self, num):
+        self.size = num
+        self.genome = None
+        self.fitness = float('inf')
+
+    def copy(self):
+        new_individual = Individual(self.size)
+        new_individual.genome = self.genome.copy()
+        new_individual.fitness = self.fitness
+        return new_individual
+    
+    def __repr__(self):
+        return f"Individual(fitness={self.fitness}, genome={self.genome})"
+    
+    def to_dict(self):
+        return {
+            "fitness": self.fitness,
+            "genome": self.genome
+        }
+
+# class bài toán (TSP/Knapsack)
+class TSP:
+    def __init__(self, file_name = "GA\\eil51.dat", opt_file_name = "GA\\eil51opt.dat"):
+        self.vertices = []
+        self.dist_matrix = []
+        self.file_name = file_name
+        self.opt_file_name = opt_file_name
+        self.size = 0
+        self.best_individual = None
+        self.read_file()
+        self.compute_dist_matrix()
+        self.get_best_individual_answer()
+
+    # đọc file dữ liệu
+    def read_file(self):
+        with open(self.file_name, 'r') as f:
+            for line in f:
+                parts = line.split()
+                index, x, y = float(parts[0]), float(parts[1]), float(parts[2])
+                self.vertices.append((x, y))
+    
+    # ma trận khoảng cách
+    def compute_dist_matrix(self):
+        n = len(self.vertices)
+        self.size = n
+        self.dist_matrix = [[0.0] * n for _ in range (n)]
+        for i in range(n):
+            for j in range(n):
+                x1, y1 = self.vertices[i]
+                x2, y2 = self.vertices[j]
+                self.dist_matrix[i][j] = math.sqrt((x1 - x2) ** 2 + (y1 - y2) ** 2)
+    
+    # fitness
+    def calculate_fitness(self, individual, num = None):
+        if (num == 0 or num is None): num = self.size
+        fitness = 0
+        for i in range(num - 1):
+            # tmp_genome = individual.decode(individual)
+            fitness += self.dist_matrix[individual.genome[i]][individual.genome[i + 1]]
+        fitness += self.dist_matrix[individual.genome[-1]][individual.genome[0]]
+        return fitness
+    
+    def get_best_individual_answer(self):
+        self.best_individual = {
+            "fitness": float('inf'),
+            "genome": []
+        }
+        with open(self.opt_file_name, "r") as f:
+            for line in f:
+                vertice = int(line.strip())
+                self.best_individual["genome"].append(vertice - 1)
+        # print(self.best_individual["genome"])
+        fitness = 0
+        for i in range (len(self.best_individual["genome"]) - 1):
+            fitness += self.dist_matrix[self.best_individual["genome"][i]][self.best_individual["genome"][i + 1]]
+        fitness += self.dist_matrix[self.best_individual["genome"][-1]][self.best_individual["genome"][0]]
+        self.best_individual["fitness"] = fitness
+
+# class lai tạo, đột biến...
+class PermutationIndividual(Individual):
+    def __init__(self, num = 0):
+        super().__init__(num)
+        self.genome = list(range(num))
+        random.shuffle(self.genome)
+
+    # đối với hoán vị thì không cần giải mã
+    def decode(self, indi):
+        return indi.copy()
+    
+    # lai
+    def crossover(i1, i2):
+        size = len(i1.genome)
+        a, b = sorted(random.sample(range(size), 2))
+
+        child1_genome = [None] * size
+        child2_genome = [None] * size
+
+        child1_genome[a:b] = i1.genome[a:b]
+        child2_genome[a:b] = i2.genome[a:b]
+
+        def fill(child, parent):
+            pos = b % size
+            for gene in parent.genome:
+                if gene not in child:
+                    child[pos] = gene
+                    pos = (pos + 1) % size
+
+        fill(child1_genome, i2)
+        fill(child2_genome, i1)
+
+        c1 = i1.copy()
+        c2 = i2.copy()
+        c1.genome = child1_genome
+        c2.genome = child2_genome
+        return c1, c2
+    
+    # đột biến
+    def mutate(i1):
+        child = i1.copy()
+        a, b = random.sample(range(len(child.genome)), 2)
+        child.genome[a], child.genome[b] = child.genome[b], child.genome[a]
+        return child
+
+class RealCodedIndividual(Individual):
+    def __init__(self, num=0, low=0.0, high=1.0):
+        super().__init__(num)
+        # khởi tạo genome là list các số thực trong [low, high]
+        self.genome = [random.uniform(low, high) for _ in range(num)]
+        self.low = low
+        self.high = high
+
+    # với real-coded thì không cần decode riêng
+    def decode(self, indi):
+        # sắp xếp chỉ số theo giá trị genome
+        order = sorted(range(len(indi.genome)), key=lambda i: indi.genome[i])
+
+        child = PermutationIndividual(indi.size)
+        child.genome = order
+        child.fitness = indi.fitness
+        return child
+    
+    # Crossover: dùng blend crossover
+    @staticmethod
+    def crossover(i1, i2, alpha=0.5):
+        size = len(i1.genome)
+        child1_genome = []
+        child2_genome = []
+        for g1, g2 in zip(i1.genome, i2.genome):
+            cmin, cmax = min(g1, g2), max(g1, g2)
+            I = cmax - cmin
+            lower = cmin - alpha * I
+            upper = cmax + alpha * I
+            child1_genome.append(random.uniform(lower, upper))
+            child2_genome.append(random.uniform(lower, upper))
+
+        c1 = i1.copy()
+        c2 = i2.copy()
+        c1.genome = child1_genome
+        c2.genome = child2_genome
+        return c1, c2
+    
+    # Mutation: thay đổi nhỏ một gene
+    @staticmethod
+    def mutate(i1, mutation_strength=0.1):
+        child = i1.copy()
+        idx = random.randrange(len(child.genome))
+        # thêm nhiễu Gaussian
+        child.genome[idx] += random.gauss(0, mutation_strength)
+        return child
+
+
+# class thuật toán (GA/MFEA) (khởi tạo quần thể, tính toán...)
+class GA:
+    def __init__(self, problem, seed, ops, max_pop = 100, num_generation = 500, mutate_rate = 0.1, crossover_rate = 0.9, k_tournament = 3, **kwargs):
+        self.problem = problem(**kwargs)
+        self.population = list()
+        self.max_pop = max_pop # số cá thể trong quần thể
+        self.seed = seed
+        self.num_generation = num_generation # số thế hệ
+        self.mutate_rate = mutate_rate # tỉ lệ đột biến
+        self.crossover_rate = crossover_rate # tỉ lệ lai
+        self.ops = ops # kiểu individual
+        self.best_individual = ops() # individual tốt nhất tìm được
+        self.answer = self.problem.best_individual # đáp án của bài toán
+        self.k_tournament = k_tournament
+        self.history_best = []
+        print(f"Answer fitness: {self.answer["fitness"]}")
+    
+    def initialize(self):
+        random.seed(self.seed)
+        for _ in range(self.max_pop):
+            new_ind = self.ops(self.problem.size) # new individual chưa mã hoá
+            # new_ind.fitness = self.problem.calculate_fitness(new_ind, self.problem.size)
+            self.population.append(new_ind)
+    
+    def evaluate(self):
+        for ind in self.population:
+            # giải mã trước khi đưa vào tính toán
+            ind.fitness = self.problem.calculate_fitness(self.ops().decode(ind), self.problem.size)
+
+    def tournament_selection(self):
+        candidates = random.sample(self.population, self.k_tournament)
+        return min(candidates, key=lambda ind: ind.fitness)  # TSP là minimization
+
+    def run(self):
+        self.initialize()
+        self.evaluate()
+        best = min(self.population, key=lambda ind: ind.fitness)
+        self.history_best.append(best.fitness)
+
+        for _ in range(self.num_generation):
+            new_population = []
+
+            while len(new_population) < self.max_pop:
+                # Selection
+                p1 = self.tournament_selection()
+                p2 = self.tournament_selection()
+
+                # Crossover
+                if random.random() < self.crossover_rate:
+                    c1, c2 = self.ops.crossover(p1, p2)
+                else:
+                    c1, c2 = p1.copy(), p2.copy()
+
+                # Mutation
+                if random.random() < self.mutate_rate:
+                    c1 = self.ops.mutate(c1)
+                if random.random() < self.mutate_rate:
+                    c2 = self.ops.mutate(c2)
+
+                new_population.extend([c1, c2])
+
+            # cập nhật quần thể
+            self.population = new_population[:self.max_pop]
+            self.evaluate()
+            best = min(self.population, key=lambda ind: ind.fitness)
+            self.history_best.append(best.fitness)  
+
+            # print(f"Generation {_}: best fitness = {best.fitness}")
+            if best.fitness < self.best_individual.fitness:
+                self.best_individual = best.copy()
+
+# có thể dùng hàm, không nhất thiết class
+class Experiment:
+    def __init__(self, algo, problem, seed_list = range(30), **algo_kwards):
+        self.algo = algo
+        self.problem = problem
+        self.seeds = seed_list
+        self.algo_kwards = algo_kwards
+    
+    def run(self):
+        result = []
+        for (i, seed) in enumerate(self.seeds):
+            algorithm = self.algo(self.problem, seed, **self.algo_kwards)
+            # if (len(result) == 0): result.append(algorithm.answer)
+
+            # khởi tạo quần thể, tính toán, lai tạo...
+            algorithm.run()
+            # lưu kết quả tốt nhất tìm được
+            best = min(algorithm.population, key=lambda ind: ind.fitness) 
+            """
+                population: là 1 list chứa các cá thể.
+                Cá thể nên có các thuộc tính genome (biểu diễn giá trị), fitness
+                Kiến nghị: nên tạo hàm copy() cho cá thể.
+            """
+            # print(f"Seed {i}, best = {best.fitness}") # giá trị tìm được
+            print(f"Seed {i}, best = {algorithm.best_individual.fitness}") 
+            best_individual_decoded = algorithm.ops().decode(algorithm.best_individual)
+            result.append(best_individual_decoded)
+        return result, algorithm.history_best
+
+# danh sách thí nghiệm
+experiments = [
+    {
+        "name": "eil51-permutation",
+        "exp": Experiment(
+            GA, TSP, range(1),
+            ops=PermutationIndividual,
+            k_tournament = 7,
+            file_name="GA/eil51.dat",
+            opt_file_name="GA/eil51opt.dat"
+        )
+    },
+    {
+        "name": "eil101-permutation",
+        "exp": Experiment(
+            GA, TSP, range(1),
+            ops=PermutationIndividual,
+            k_tournament = 7,            
+            file_name="GA/eil101.dat",
+            opt_file_name="GA/eil101opt.dat"
+        )
+    },
+    {
+        "name": "eil51-real-coded",
+        "exp": Experiment(
+            GA, TSP, range(1),
+            ops=RealCodedIndividual,
+            k_tournament = 3,            
+            file_name="GA/eil51.dat",
+            opt_file_name="GA/eil51opt.dat"
+        )
+    },
+    {
+        "name": "eil101-real-coded",
+        "exp": Experiment(
+            GA, TSP, range(1),
+            ops=RealCodedIndividual,
+            k_tournament = 3,            
+            file_name="GA/eil101.dat",
+            opt_file_name="GA/eil101opt.dat"
+        )
+    }
+]
+
+# chạy và lưu kết quả
+import json
+histories = {}
+
+for e in experiments:
+    print(f"Running experiment: {e['name']}")
+    result, history_best = e["exp"].run()  # result: list[Individual], một cá thể tốt nhất cho mỗi seed
+    histories[e["name"]] = history_best
+
+plt.figure()
+plt.plot(histories["eil51-permutation"], label="Permutation (eil51)")
+plt.plot(histories["eil51-real-coded"], label="Real-coded (eil51)")
+plt.xlabel("Generation")
+plt.ylabel("Best fitness")
+plt.title("Best-of-Generation on eil51")
+plt.legend()
+plt.grid(True, alpha=0.3)
+plt.tight_layout()
+plt.savefig("GA/images/plot_eil51.png", dpi=150)
+
+plt.figure()
+plt.plot(histories["eil101-permutation"], label="Permutation (eil101)")
+plt.plot(histories["eil101-real-coded"], label="Real-coded (eil101)")
+plt.xlabel("Generation")
+plt.ylabel("Best fitness")
+plt.title("Best-of-Generation on eil101")
+plt.legend()
+plt.grid(True, alpha=0.3)
+plt.tight_layout()
+plt.savefig("GA/images/plot_eil101.png", dpi=150)
