@@ -1,7 +1,7 @@
 from ga_real_tsp import *
 
 # Đọc dữ liệu
-cities = load_tsp_data('eil51.tsp')
+cities = load_tsp_data('../eil51.tsp')
 problem = TSPProblem(cities)
 
 # Chạy experiment
