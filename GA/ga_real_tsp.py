@@ -308,5 +308,4 @@ class Experiment:
         print(f"Best Found: {best_fitness:.2f}")
         print(f"Average: {avg_fitness:.2f}")
         print(f"Std Dev: {np.std(fitness_values):.2f}")
-        
         return results, fitness_values
