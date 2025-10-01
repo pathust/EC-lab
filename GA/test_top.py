@@ -9,15 +9,16 @@ from ga_real_operators import (
 )
 
 def run_top_configuration():
-    """Chạy cấu hình tốt nhất: Blend-Polynomial-Tournament với 30 seeds"""
+    """Chạy cấu hình tốt nhất: Blend-Gaussian-Truncation với 30 seeds"""
     
     # Đọc dữ liệu TSP
     problem = TSP('../eil51.tsp', '')
     
-    # Cấu hình toán tử
+    # ===== SỬA ĐÂY =====
+    # Cấu hình toán tử - ĐÚNG với top 1: Blend-Gaussian-Truncation
     crossover_op = CrossoverOperators.blend_crossover
-    mutation_op = MutationOperators.polynomial_mutation
-    selection_op = SelectionOperators.tournament_selection
+    mutation_op = MutationOperators.gaussian_mutation      # ← ĐÃ SỬA: gaussian thay vì polynomial
+    selection_op = SelectionOperators.truncation_selection
     
     # Tham số GA
     NUM_SEEDS = 30
@@ -27,7 +28,7 @@ def run_top_configuration():
     PM = 0.1
     
     print("\n" + "="*70)
-    print("=== CHẠY CẤU HÌNH TỐT NHẤT: BLEND-POLYNOMIAL-TOURNAMENT ===")
+    print("=== CHẠY CẤU HÌNH TỐT NHẤT: BLEND-GAUSSIAN-TRUNCATION ===")
     print("="*70)
     print(f"Quần thể: {POP_SIZE}")
     print(f"Số thế hệ: {GENERATIONS}")
