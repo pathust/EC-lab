@@ -113,3 +113,20 @@ def blend_crossover(p1: Individual, p2: Individual, alpha: float = 0.5) -> Tuple
         c2_genome.append(random.uniform(lower, upper))
     
     return Individual(c1_genome), Individual(c2_genome)
+
+def sbx_crossover(p1: Individual, p2: Individual, eta: float = 2.0, prob: float = 1.0):
+    size = len(p1.genome)
+    c1, c2 = [], []
+    for i in range(size):
+        if random.random() <= prob:
+            u = random.random()
+            if u <= 0.5:
+                beta = (2 * u) ** (1 / (eta + 1))
+            else:
+                beta = (1 / (2 * (1 - u))) ** (1 / (eta + 1))
+            c1.append(0.5 * ((1 + beta) * p1.genome[i] + (1 - beta) * p2.genome[i]))
+            c2.append(0.5 * ((1 - beta) * p1.genome[i] + (1 + beta) * p2.genome[i]))
+        else:
+            c1.append(p1.genome[i])
+            c2.append(p2.genome[i])
+    return Individual(c1), Individual(c2)
