@@ -18,9 +18,21 @@ class TSP:
     def read_file(self):
         with open(self.file_name, 'r') as f:
             for line in f:
+                line = line.strip()
+                # Bỏ qua các dòng header và dòng trống
+                if not line or ':' in line or line.startswith('NAME') or line.startswith('TYPE') or \
+                line.startswith('COMMENT') or line.startswith('DIMENSION') or \
+                line.startswith('EDGE_WEIGHT_TYPE') or line == 'NODE_COORD_SECTION' or line == 'EOF':
+                    continue
+                
                 parts = line.split()
-                index, x, y = float(parts[0]), float(parts[1]), float(parts[2])
-                self.vertices.append((x, y))
+                if len(parts) >= 3:
+                    try:
+                        # parts[0] là index, parts[1] là x, parts[2] là y
+                        x, y = float(parts[1]), float(parts[2])
+                        self.vertices.append((x, y))
+                    except ValueError:
+                        continue
     
     def compute_dist_matrix(self):
         n = len(self.vertices)
@@ -61,20 +73,18 @@ class Individual:
         self.size = num
         self.genome = [random.random() for _ in range(num)]
         self.fitness = float('inf')
+        self.tour = []
 
     def copy(self):
         new_individual = Individual(self.size)
         new_individual.genome = self.genome.copy()
         new_individual.fitness = self.fitness
+        new_individual.tour = self.tour.copy()
         return new_individual
 
     def decode(self):
         """Decode real-valued genome to permutation"""
-        order = sorted(range(len(self.genome)), key=lambda i: self.genome[i])
-        decoded = Individual(self.size)
-        decoded.genome = order
-        decoded.fitness = self.fitness
-        return decoded
+        return sorted(range(len(self.genome)), key=lambda i: self.genome[i])
 
 # ==================== Crossover Operators ====================
 class CrossoverOperators:
@@ -178,11 +188,11 @@ class MutationOperators:
                 individual.genome[i] += random.gauss(0, mutation_strength)
     
     @staticmethod
-    def uniform_mutation(individual, low=0.0, high=1.0, pm=0.1):
+    def uniform_mutation(individual, low=-0.5, high=0.5, pm=0.1):
         """Uniform Mutation"""
         for i in range(len(individual.genome)):
             if random.random() < pm:
-                individual.genome[i] = random.uniform(low, high)
+                individual.genome[i] += random.uniform(low, high)
 
 # ==================== Selection Operators ====================
 class SelectionOperators:
@@ -251,14 +261,24 @@ class GeneticAlgorithm:
         """Initialize population"""
         self.population = []
         for _ in range(self.pop_size):
+            genome = [random.random() for _ in range(self.problem.size)]
             individual = Individual(self.problem.size)
+            individual.genome = genome
             self.population.append(individual)
     
     def evaluate(self):
         """Evaluate population and update best"""
         for individual in self.population:
-            decoded = individual.decode()
-            individual.fitness = self.problem.calculate_fitness(decoded)
+            tour = individual.decode()
+            individual.tour = tour
+            
+            total_distance = 0
+            for i in range(len(tour)):
+                current_city = tour[i]
+                next_city = tour[(i + 1) % len(tour)]
+                total_distance += self.problem.dist_matrix[current_city][next_city]
+            
+            individual.fitness = total_distance
         
         current_best = min(self.population, key=lambda ind: ind.fitness)
         if self.best_individual is None or current_best.fitness < self.best_individual.fitness:
@@ -266,6 +286,10 @@ class GeneticAlgorithm:
     
     def evolve(self):
         """Evolution loop"""
+        self.initialize()
+        self.evaluate()
+        self.fitness_history.append(self.best_individual.fitness)
+        
         for generation in range(self.generations):
             new_population = []
             
@@ -296,9 +320,6 @@ class GeneticAlgorithm:
             self.evaluate()
             
             # Track history
-            current_best_fitness = min(ind.fitness for ind in self.population)
-            self.fitness_history.append(current_best_fitness)
-    
-    def get_best_fitness(self):
-        """Get best fitness found"""
-        return self.best_individual.fitness if self.best_individual else float('inf')
+            self.fitness_history.append(self.best_individual.fitness)
+        
+        return self.best_individual.fitness
