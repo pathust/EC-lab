@@ -4,9 +4,9 @@ import numpy as np
 
 from problem import *
 from population import Population
-from GA.crossover_operators import order_crossover, arithmetic_crossover
-from GA.mutation_operators import swap_mutation, gaussian_mutation
-from GA.selection_operators import tournament_selection
+from crossover_operators import order_crossover, arithmetic_crossover
+from mutation_operators import swap_mutation, gaussian_mutation
+from selection_operators import tournament_selection
 
 class GeneticAlgorithm:
     def __init__(self, 
